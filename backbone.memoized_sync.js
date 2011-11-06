@@ -65,7 +65,16 @@
     return _.isFunction(object.url) ? object.url() : object.url;
   };
 
-  Backbone.memoized_sync = function(method, model, options) {
+  // Ported from Modernizr
+  function supports_local_storage() {
+    try {
+      return 'localStorage' in window && window.localStorage !== null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Backbone.memoized_sync = function (method, model, options) {
     var type = methodMap[method];
 
     // Default JSON-request options.
@@ -111,7 +120,7 @@
     // This is the modified part:
     // - Look for the cached version and trigger success if it's present.
     // - Modify the AJAX request so it'll save the data on success.
-    if (method === 'read' && window.localStorage) {
+    if (method === 'read' && supports_local_storage()) {
       // Look for the cached version
       var namespace = model.cache_namespace || "_",
           key = "backbone-cache/" + namespace + "/" + params.url,
