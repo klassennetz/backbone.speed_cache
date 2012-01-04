@@ -1,5 +1,13 @@
-Backbone.memoized_sync 0.1.0
+Fork of Backbone.memoized_sync
 ==========================
+This fork will implore the caching functions further eventually adding 
+support for encryption, cache expiration and multiple cache backends
+
+
+Original readme:
+
+Backbone.memoized_sync 0.1.0
+-------------------------------------
 
 Made by Pablo Villalba for the Teambox project
 May be freely distributed under the MIT license
