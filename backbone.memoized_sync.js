@@ -14,7 +14,7 @@
 //
 // This modified version changes the behavior for 'read' requests to the following:
 //
-// 1. Check if we have it in localStorage.
+// 1. Check if we have it in secureStorage.
 // 2. If we have it, then...
 //   - We call the success function with the cached data
 //   - We request new data with an AJAX request, which calls the success function again
@@ -73,6 +73,24 @@
       return false;
     }
   }
+ 
+  var secureStorage = {
+		enc_key : randomPassword(12), // so storage is lost after hard reload 
+		
+		//TODO:implement proper caching system with expiration and encryption using user keys etc.
+		getItem: function(key){
+			key = Tea.encrypt(key,this.enc_key);
+			data = localStorage.getItem(key);
+			if(data == null) return '';
+			return Tea.decrypt(data,this.enc_key);
+		
+	    },
+	    setItem: function(key,data){	
+			key = Tea.encrypt(key,this.enc_key);
+			data = Tea.encrypt(data,this.enc_key);
+			return localStorage.setItem(key,data);
+	   }
+   }
 
   Backbone.memoized_sync = function (method, model, options) {
     var type = methodMap[method];
@@ -124,7 +142,7 @@
       // Look for the cached version
       var namespace = model.cache_namespace || "_",
           key = "backbone-cache/" + namespace + "/" + params.url,
-          val = localStorage.getItem(key),
+          val = secureStorage.getItem(key),
           successFn = params.success;
 
       // If we have the last response cached, use it with the success callback
@@ -137,7 +155,7 @@
       // Overwrite the success callback to save data to localStorage
       params.success = function (resp, status, xhr) {
         successFn(resp, status, xhr);
-        localStorage.setItem(key, xhr.responseText);
+        secureStorage.setItem(key, xhr.responseText);
       };
 
     }
