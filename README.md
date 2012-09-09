@@ -1,56 +1,33 @@
-Fork of Backbone.memoized_sync
-==========================
-This fork will implore the caching functions further eventually adding 
-support for encryption, cache expiration and multiple cache backends
-
-
-Original readme:
-
-Backbone.memoized_sync 0.1.0
--------------------------------------
-
-Made by Pablo Villalba for the Teambox project
+Backbone.speed_cache 0.2
 May be freely distributed under the MIT license
 
+sync code & ideas adopted from:
+	Backbone.memoized_sync 0.1 
+	by Pablo Villalba for the Teambox project 
+	distributed under the MIT license 
 
-What does Backbone.memoized_sync solve
+What does Backbone.speed_cache solve
 --------------------------------------
-
-The default Backbone.sync sends an AJAX request every time. When an app needs to
-request too much data to start up, the UX can suffer.
-
 This modified version changes the behavior for 'read' requests to the following:
 
 1. Check if we have it in localStorage.
 2. If we have it, then...
   - We call the success function with the cached data
-  - We request new data with an AJAX request, which calls the success function again
+  - We request new data with an AJAX request, which calls the success function again if the data is different from the cache
 3. If we don't have it, we do a classic AJAX request and save its results to localStorage
 
+All Data stored in localStorage is encrypted.
 
 How to enabled memoized sync for your models and collections
 ------------------------------------------------------------
+Inlcude backbone.speed_cache.js
+Call Backbone.secureStorage.setEncKey(key) with an user specific key as soon as possible. Until then, data is kept in memory only.
 
-You must define your model's or collection's sync to be Backbone.memoized_sync:
+Dependencies: Tea.js (included in repository)
 
-    this.sync = Backbone.memoized_sync;
-
-That's it! Now every GET request will be written to localStorage and retrieved
-from there the next time you request it.
-
-
-Handling multiple sessions or users
------------------------------------
-
-In order to use this with per-session caches, you will need to define the
-*cache_namespace* attribute in your models and collections. The sync method will
-store the results of successful calls in "#{cache_namespace}/#{requested_url}"
-
-If you are caching sensitive data, remember to clear localStorage when logging out
-or when loggin in with a different user.
-
-
-Targeted Backbone versions
---------------------------
-This modified Backbone.sync targets Backbone 0.5.3.
-
+Warnings
+------------------------------------------------------------
+Including this file will override the default backbone sync method.
+Until an encryption key is provided, data is only kept in memory.
+Simple cache clearing method DELETES ALL local storage after 100 cache entries.
+Modeled after Backbone 0.9.2
