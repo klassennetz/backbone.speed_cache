@@ -1,10 +1,10 @@
-Backbone.speed_cache 0.2
+#Backbone.speed_cache 0.2
 May be freely distributed under the MIT license
 
 sync code & ideas adopted from:
-	Backbone.memoized_sync 0.1 
+	**Backbone.memoized_sync 0.1**
 	by Pablo Villalba for the Teambox project 
-	distributed under the MIT license 
+	*distributed under the MIT license*
 
 What does Backbone.speed_cache solve
 --------------------------------------
@@ -20,14 +20,14 @@ All Data stored in localStorage is encrypted.
 
 How to enabled memoized sync for your models and collections
 ------------------------------------------------------------
-Inlcude backbone.speed_cache.js
-Call Backbone.secureStorage.setEncKey(key) with an user specific key as soon as possible. Until then, data is kept in memory only.
+1. Inlcude backbone.speed_cache.js
+2. Call Backbone.secureStorage.setEncKey(key) with an user specific key as soon as possible. Until then, data is kept in memory only.
 
 Dependencies: Tea.js (included in repository)
 
 Warnings
 ------------------------------------------------------------
-Including this file will override the default backbone sync method.
-Until an encryption key is provided, data is only kept in memory.
-Simple cache clearing method DELETES ALL local storage after 100 cache entries.
-Modeled after Backbone 0.9.2
+* Including this file will override the default backbone sync method.
+* Until an encryption key is provided, data is only kept in memory.
+* Simple cache clearing method DELETES ALL local storage after 100 cache entries.
+* Modeled after Backbone 0.9.2
