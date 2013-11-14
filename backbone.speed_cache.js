@@ -1,34 +1,42 @@
-// Backbone SpeedCache v0.2
+// Backbone SpeedCache v0.3
 // by Gregor Godbersen
+// Originally forked from Backbone.memoized_sync 0.1 by Pablo Villalba
+
 // May be freely distributed under the MIT license 
 
+
 // Dependencies: Underscore.js, Backbone.js, Tea.js
+
+
+// !!Warnings!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !
 // ! Including this file will override the default backbone sync method.
 // ! Until an encryption key is provided, data is only kept in memory.
 // ! Simple cache clearing method DELETES ALL local storage after 100 cache entries.
-// ! Modeled after Backbone 0.9.2
+// ! Targets Backbone.js 1.0.0
+// !
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
 // All results of ajax GET request are saved to local storage. 
 // Upon new requests, the success function will be called immediately with the cached data before launching the regular ajax request. 
-//	If the ajax request returns differing data, the success function will be called again with the fresh data.
+// If the ajax request returns differing data, the success function will be called again with the fresh data.
 // All Data is encrypted before beeing written to local storage. Call Backbone.secureStorage.setEncKey(key) with an user specific key.
 
-// sync code & ideas adopted from Backbone.memoized_sync 0.1 by Pablo Villalba for the Teambox project distributed under the MIT license 
 
-(function () {
+ 
+ 
+ 
+(function () { 
+  
   // Map from CRUD to HTTP for our default `Backbone.sync` implementation.
   var methodMap = {
     'create': 'POST',
     'update': 'PUT',
+    'patch':  'PATCH',
     'delete': 'DELETE',
-    'read'  : 'GET'
-  };
-
-  // Helper function to get a URL from a Model or Collection as a property
-  // or as a function.
-  var getUrl = function(object) {
-    if (!(object && object.url)) return null;
-    return _.isFunction(object.url) ? object.url() : object.url;
+    'read':   'GET'
   };
 
   // Ported from Modernizr
@@ -65,21 +73,20 @@
 		},
 		
 		getItem: function(key){
-		
 			// if encryption key has not been given, or local storage is unavaliable: Serve the request from memory array.
 			if(!this.enc_key || !supports_local_storage()) 
 				return _.find(this.tempMemory,function(val){  return val.key == key });
 			
 			// otherwise serve from storage
 			key = Tea.encrypt(key,this.enc_key);
-			data = localStorage.getItem(key);
-			if(data == null) return '';
+			
+                        var data = localStorage.getItem(key);
+			if(data == null || data.length == 0) return null;
 			return Tea.decrypt(data,this.enc_key);
 		
 	    },
 		
 	    setItem: function(key,data){
-		
 			// if encryption key hasn't been set or local storage is not supported: Store data in memory array.
 			if(!this.enc_key || !supports_local_storage()) {
 				this.tempMemory.push({"key":key,"data":data});
@@ -93,81 +100,107 @@
 	   }
    }
 
-   
-  // Overriding the sync method
-  Backbone.memoized_sync =  function (method, model, options) {
-        var type = methodMap[method];
+
+
+Backbone.speed_cache = function(method, model, options) {
+    
+    var noXhrPatch = typeof window !== 'undefined' && !!window.ActiveXObject && !(window.XMLHttpRequest && (new XMLHttpRequest).dispatchEvent);
+
+	// Map from CRUD to HTTP for our default `Backbone.sync` implementation.
+	var methodMap = {
+		'create': 'POST',
+		'update': 'PUT',
+		'patch':  'PATCH',
+		'delete': 'DELETE',
+		'read':   'GET'
+	};
+    
+    var type = methodMap[method];
 
     // Default options, unless specified.
-    options || (options = {});
+    _.defaults(options || (options = {}), {
+      emulateHTTP: Backbone.emulateHTTP,
+      emulateJSON: Backbone.emulateJSON
+    });
 
     // Default JSON-request options.
-    var params = _.extend(options,{type: type, dataType: 'json'});
+    var params = {type: type, dataType: 'json'};
 
     // Ensure that we have a URL.
     if (!options.url) {
-      params.url = getUrl(model) || urlError();
+      params.url = _.result(model, 'url') || urlError();
     }
 
     // Ensure that we have the appropriate request data.
-    if (!options.data && model && (method == 'create' || method == 'update')) {
+    if (options.data == null && model && (method === 'create' || method === 'update' || method === 'patch')) {
       params.contentType = 'application/json';
-      params.data = JSON.stringify(model.toJSON());
+      params.data = JSON.stringify(options.attrs || model.toJSON(options));
     }
 
     // For older servers, emulate JSON by encoding the request into an HTML-form.
-    if (Backbone.emulateJSON) {
+    if (options.emulateJSON) {
       params.contentType = 'application/x-www-form-urlencoded';
       params.data = params.data ? {model: params.data} : {};
     }
 
     // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
     // And an `X-HTTP-Method-Override` header.
-    if (Backbone.emulateHTTP) {
-      if (type === 'PUT' || type === 'DELETE') {
-        if (Backbone.emulateJSON) params.data._method = type;
-        params.type = 'POST';
-        params.beforeSend = function(xhr) {
-          xhr.setRequestHeader('X-HTTP-Method-Override', type);
-        };
-      }
+    if (options.emulateHTTP && (type === 'PUT' || type === 'DELETE' || type === 'PATCH')) {
+      params.type = 'POST';
+      if (options.emulateJSON) params.data._method = type;
+      var beforeSend = options.beforeSend;
+      options.beforeSend = function(xhr) {
+        xhr.setRequestHeader('X-HTTP-Method-Override', type);
+        if (beforeSend) return beforeSend.apply(this, arguments);
+      };
     }
 
     // Don't process data on a non-GET request.
-    if (params.type !== 'GET' && !Backbone.emulateJSON) {
+    if (params.type !== 'GET' && !options.emulateJSON) {
       params.processData = false;
     }
-	
+
+    // If we're sending a `PATCH` request, and we're in an old Internet Explorer
+    // that still has ActiveX enabled by default, override jQuery to use that
+    // for XHR instead. Remove this line when jQuery supports `PATCH` on IE8.
+    if (params.type === 'PATCH' && noXhrPatch) {
+      params.xhr = function() {
+        return new ActiveXObject("Microsoft.XMLHTTP");
+      };
+    }
+    
     var key = "backbone_cache_" + params.url;
+    
     if (method === 'read') {
-      // Look for the cached version
-	  
-	  var valString =  Backbone.secureStorage.getItem(key),
-		  successFn = params.success;
+		  // Look for the cached version
 		  
-	  // If we have the last response cached, use it with the success callback
-      if (valString) {
-        _.defer(function () {
-          successFn(JSON.parse(valString), "success");
-        });
-      }
-	  
-      // Overwrite the success callback to save data to localStorage
-      params.success = function (resp, status, xhr) {
-		 if(valString && JSON.stringify(JSON.parse(valString)) == JSON.stringify(resp))
+		var cachedString =  Backbone.secureStorage.getItem(key),
+			successFn = options.success;
+		delete options.success;
+		if(cachedString)
+			successFn(JSON.parse(cachedString), 'success', options);
+
+
+		
+		// Overwrite the success callback to save data to localStorage
+        options.success = function (model, resp, options) {
+		 var responseString = JSON.stringify(model);
+		 if(cachedString && JSON.stringify(JSON.parse(cachedString)) == responseString)
 			return; // if new data is equal to cached, do not recall success function
 		 
-		 successFn(resp, status, xhr);
-         Backbone.secureStorage.setItem(key, xhr.responseText);
+          successFn(model, resp, options);
+          Backbone.secureStorage.setItem(key, responseString);
       };
-
-    }
-
-    // Make the request.
-     return $.ajax(params);
+	}
+	
+    // Make the request, allowing the user to override any Ajax options.
+    var xhr = options.xhr = Backbone.ajax(_.extend(params, options));
+    model.trigger('request', model, xhr, options);
+    return xhr;
   };
 
-}).call(this);
 
-// Override original function
-Backbone.sync = Backbone.memoized_sync;
+ }).call(this);
+ 
+ // install as default sync provider
+ Backbone.sync = Backbone.speed_cache;
